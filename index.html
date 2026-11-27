@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>학원 시간표</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#00463c"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="학원 시간표">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style id="css">
+/* VOICE: 교무실 벽 시간표판처럼 차분하고 정확한 업무 도구
+   IDEA: 자석 이름표를 붙이는 주간 시간표 보드 (교시 × 선생님)
+   PICTURE: 보드 자체가 그림 — 빈칸(공강)은 코랄 점선, 충돌은 코랄 테두리
+   COLOUR and TYPE: 딥그린 #00463c 헤더, 흰 바탕, 라임화이트·코랄 / Inter Tight + Noto Sans KR
+   LAYOUT: 상단 요약 수치 → 요일 탭 → 보드, 휴대폰은 가로 스크롤 */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0e1513);--ink:light-dark(#10211d,#e6efe9);--mute:light-dark(#5c6b67,#9aaba5);--line:light-dark(#dfe6e3,#24322e);--card:light-dark(#f4f8f6,#15201d);--g:#00463c;--lime:#e6f5c8;--coral:#ff6f59;--coralbg:light-dark(#fff0ec,#3a1f1a);--off:light-dark(#eef1f0,#121b19)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Noto Sans KR",system-ui,sans-serif;overflow-x:clip}
+.num,.t{font-family:"Inter Tight","Noto Sans KR",sans-serif;font-variant-numeric:tabular-nums}
+header{background:var(--g);color:#fff;padding:22px max(4vw,16px) 18px}
+.top{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline;justify-content:space-between}
+h1{margin:0;font:700 32px/1.05 "Inter Tight","Noto Sans KR",sans-serif;letter-spacing:-.5px}
+.status{font-size:13px;color:var(--lime);display:flex;gap:8px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--lime)}.status.busy .dot{background:var(--coral)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;margin-top:16px;background:rgba(255,255,255,.18);border-radius:10px;overflow:hidden}
+.kpi{background:var(--g);padding:10px 14px}.kpi b{display:block;font:700 28px/1.1 "Inter Tight",sans-serif}.kpi span{font-size:13px;color:#cfe3dc}
+.kpi.bad b{color:var(--coral)}
+nav{display:flex;gap:4px;margin-top:16px;overflow-x:auto}
+nav button{flex:none;background:transparent;color:#d6e8e1;border:0;border-bottom:3px solid transparent;padding:8px 12px;font:500 16px "Noto Sans KR";cursor:pointer;min-height:44px}
+nav button[aria-current=true]{color:#fff;border-color:var(--lime)}
+main{padding:18px max(4vw,16px) 48px;max-width:1500px;margin:auto}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.btn{min-height:44px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:500 15px "Noto Sans KR";cursor:pointer}
+.btn.pri{background:var(--g);color:#fff;border-color:var(--g)}.btn.warn{color:var(--coral)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,select:focus-visible,input:focus-visible,nav button:focus-visible,td button:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.days button{min-width:52px;min-height:44px;border-radius:22px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:700 16px "Noto Sans KR";cursor:pointer}
+.days button[aria-pressed=true]{background:var(--g);color:#fff;border-color:var(--g)}
+.spacer{flex:1}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table.board{border-collapse:separate;border-spacing:0;width:100%;min-width:max-content}
+.board th,.board td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:0}
+.board thead th{position:sticky;top:0;background:var(--card);z-index:2;padding:8px 10px;text-align:left;font-weight:500;min-width:118px;vertical-align:top}
+.board thead th small,.board td small{display:block;color:var(--mute);font-size:13px;font-weight:400;white-space:nowrap}
+.board th.time{position:sticky;left:0;z-index:3;background:var(--bg);min-width:74px;text-align:right;padding:6px 10px;vertical-align:top}
+.board thead th.time{z-index:4;background:var(--card)}
+.time b{font:700 17px "Inter Tight";display:block}.time small{font-size:13px}
+td button{display:block;width:100%;min-height:52px;border:0;background:transparent;color:inherit;text-align:left;padding:6px 9px;font:inherit;cursor:pointer}
+td.off{background:repeating-linear-gradient(135deg,var(--off) 0 6px,transparent 6px 12px)}
+td.off button{cursor:default}
+td.gap button{outline:2px dashed var(--coral);outline-offset:-5px;color:var(--coral);font-size:13px}
+td.brk button{outline:2px dashed var(--mute);outline-offset:-5px;color:var(--mute);font-size:13px}
+.chip{display:block;border-radius:6px;padding:4px 8px;background:color-mix(in srgb,var(--c) 16%,var(--bg));border-left:4px solid var(--c);font-weight:500;white-space:nowrap}
+td.bad .chip{background:var(--coralbg);border-left-color:var(--coral);box-shadow:inset 0 0 0 2px var(--coral)}
+td.warn .chip{box-shadow:inset 0 0 0 2px #e3a33a}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--mute);margin-top:10px}
+.legend i{display:inline-block;width:16px;height:12px;vertical-align:-1px;margin-right:5px;border-radius:3px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:18px}
+@media(max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}}
+.panel{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--card)}
+.panel h3{margin:0 0 8px;font-size:17px}
+.list{list-style:none;margin:0;padding:0;font-size:15px}.list li{padding:6px 0;border-bottom:1px solid var(--line);display:flex;gap:8px;justify-content:space-between}
+.list li:last-child{border:0}.tag{font-size:13px;color:var(--coral);white-space:nowrap}.ok{color:var(--g)}:root[data-theme=dark] .ok{color:#9fd8b8}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .ok{color:#9fd8b8}}
+select,input{font:16px "Noto Sans KR";min-height:44px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+input[type=number]{width:72px}
+details.rec{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--bg)}
+details.rec summary{padding:12px 14px;cursor:pointer;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+details.rec summary b{font-size:16px}details.rec summary span{color:var(--mute);font-size:14px}
+.recbody{padding:0 14px 14px;display:grid;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.row label{font-size:14px;color:var(--mute);min-width:28px}
+.daygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.daygrid .row{background:var(--card);border-radius:8px;padding:6px 8px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}@media(max-width:900px){.two{grid-template-columns:minmax(0,1fr)}}
+h2{font:700 22px/1.2 "Inter Tight","Noto Sans KR";margin:6px 0 12px}
+.note{font-size:13px;color:var(--mute)}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.sheet>div{background:var(--bg);width:min(560px,100%);max-height:85vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px}
+@media(min-width:700px){.sheet{align-items:center}.sheet>div{border-radius:16px}}
+.pick{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:15px "Noto Sans KR";cursor:pointer;min-height:48px}
+.pick.cur{border-color:var(--g);box-shadow:inset 0 0 0 2px var(--g)}
+.pick em{font-style:normal;font-size:13px;color:var(--mute);white-space:nowrap}.pick em.x{color:var(--coral)}
+.prog{font-size:14px;color:var(--mute)}
+.board td button .chip{cursor:grab;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+body.dragging,body.dragging *{cursor:grabbing!important;user-select:none;-webkit-user-select:none}
+td.dsrc .chip{opacity:.35}
+td.dz-ok button{outline:3px solid var(--g);outline-offset:-3px;background:color-mix(in srgb,var(--g) 12%,transparent)}
+td.dz-warn button{outline:3px solid #e3a33a;outline-offset:-3px;background:color-mix(in srgb,#e3a33a 14%,transparent)}
+td.dz-no button{outline:3px solid var(--coral);outline-offset:-3px;background:var(--coralbg)}
+.ghost{position:fixed;left:0;top:0;z-index:60;pointer-events:none;background:var(--g);color:#fff;border-radius:10px;padding:8px 12px;box-shadow:0 10px 28px rgba(0,0,0,.28);max-width:260px}
+.ghost b{display:block;font-size:16px}.ghost small{display:block;font-size:13px;color:var(--lime)}
+.ghost.g-warn{background:#8a5a10}.ghost.g-no{background:#9c3020}
+.strip{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;width:132px;height:14px}
+.strip i{border-radius:2px;background:var(--off)}.strip i.on{background:var(--c)}.strip i.g{background:var(--coral)}
+.strip i.x{background:repeating-linear-gradient(135deg,var(--line) 0 2px,transparent 2px 4px)}
+.fc{padding:8px 10px;display:grid;gap:4px}.fc small{font-size:13px;color:var(--mute);white-space:nowrap}
+.flow td{min-width:156px;vertical-align:top}.flow td.fbad{background:var(--coralbg)}
+.flow th.time{min-width:118px}.flow th.time small{display:block;font-weight:400}.lnk{background:none;border:0;padding:0;font:700 16px "Noto Sans KR";color:var(--ink);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px;min-height:28px}
+@media(prefers-reduced-motion:no-preference){td button .chip{transition:transform .15s}td button:hover .chip{transform:translateY(-1px)}}
+@media(max-width:600px){h1{font-size:26px}.kpi b{font-size:22px}}
+</style></head><body><div id="root"></div>
+<script type="application/json" id="state">{"v":1,"teachers":[{"id":"T1","name":"김서연","subj":"수학","av":[[3,12],[3,12],[3,12],[3,12],[3,12]]},{"id":"T2","name":"이준호","subj":"수학","av":[[4,12],[4,12],[4,12],[4,12],[4,12]]},{"id":"T3","name":"박지민","subj":"수학","av":[[5,12],[5,12],[5,12],[5,12],[5,12]]},{"id":"T4","name":"최유나","subj":"영어","av":[[2,11],[2,11],[2,11],[2,11],[2,11]]},{"id":"T5","name":"정민재","subj":"영어","av":[[4,12],[4,12],[4,12],[4,12],[4,12]]},{"id":"T6","name":"강하은","subj":"영어","av":[[5,12],[5,12],[5,12],[5,12],[5,12]]},{"id":"T7","name":"조현우","subj":"국어","av":[[3,11],[3,11],[3,11],[3,11],[3,11]]},{"id":"T8","name":"윤소희","subj":"국어","av":[[5,12],[5,12],[5,12],[5,12],[5,12]]},{"id":"T9","name":"임도윤","subj":"과학","av":[[4,12],[4,12],[4,12],[4,12],[4,12]]},{"id":"T10","name":"한지수","subj":"사회","av":[[5,12],[5,12],[5,12],[5,12],[5,12]]}],"students":[{"id":"S1","name":"김서준","grade":"중2","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T2","n":2},{"t":"T6","n":2}],"span":[2,4]},{"id":"S2","name":"이하윤","grade":"중3","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T3","n":2},{"t":"T4","n":2},{"t":"T10","n":1}],"span":[2,4]},{"id":"S3","name":"박도윤","grade":"초5","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T3","n":2},{"t":"T4","n":2}],"span":[2,4]},{"id":"S4","name":"최서아","grade":"중1","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T1","n":2},{"t":"T6","n":2}],"span":[2,4]},{"id":"S5","name":"정시우","grade":"고2","av":[[8,12],[8,12],[8,12],[8,12],[8,12]],"req":[{"t":"T2","n":2},{"t":"T5","n":2},{"t":"T10","n":1},{"t":"T8","n":1}],"span":[2,4]},{"id":"S6","name":"강지아","grade":"초4","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T3","n":2},{"t":"T6","n":2},{"t":"T8","n":1},{"t":"T10","n":1}],"span":[2,4]},{"id":"S7","name":"조주원","grade":"중3","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T2","n":2},{"t":"T4","n":2}],"span":[2,4]},{"id":"S8","name":"윤하은","grade":"중3","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T3","n":2},{"t":"T4","n":2},{"t":"T8","n":1}],"span":[2,4]},{"id":"S9","name":"장지호","grade":"중2","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T2","n":2},{"t":"T5","n":2}],"span":[2,4]},{"id":"S10","name":"임수아","grade":"중1","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T3","n":2},{"t":"T5","n":2}],"span":[2,4]},{"id":"S11","name":"한예준","grade":"초6","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T1","n":2},{"t":"T5","n":2},{"t":"T9","n":1},{"t":"T7","n":1}],"span":[2,4]},{"id":"S12","name":"오지유","grade":"초6","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T3","n":2},{"t":"T4","n":2},{"t":"T7","n":1}],"span":[2,4]},{"id":"S13","name":"서건우","grade":"고1","av":[[8,12],[8,12],[8,12],[8,12],[8,12]],"req":[{"t":"T3","n":2},{"t":"T4","n":2},{"t":"T9","n":1}],"span":[2,4]},{"id":"S14","name":"신윤서","grade":"중1","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T1","n":2},{"t":"T4","n":2},{"t":"T10","n":1}],"span":[2,4]},{"id":"S15","name":"권우진","grade":"초4","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T3","n":2},{"t":"T6","n":2}],"span":[2,4]},{"id":"S16","name":"황채원","grade":"중1","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T1","n":2},{"t":"T4","n":2},{"t":"T9","n":1}],"span":[2,4]},{"id":"S17","name":"안선우","grade":"초6","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T3","n":2},{"t":"T6","n":2},{"t":"T7","n":1}],"span":[2,4]},{"id":"S18","name":"송지안","grade":"초5","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T3","n":2},{"t":"T5","n":2},{"t":"T7","n":1},{"t":"T9","n":1}],"span":[2,4]},{"id":"S19","name":"류민준","grade":"초4","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T2","n":2},{"t":"T6","n":2},{"t":"T8","n":1},{"t":"T9","n":1}],"span":[2,4]},{"id":"S20","name":"홍다은","grade":"초6","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T2","n":2},{"t":"T5","n":2}],"span":[2,4]},{"id":"S21","name":"김유준","grade":"고1","av":[[8,12],[8,12],[8,12],[8,12],[8,12]],"req":[{"t":"T3","n":2},{"t":"T5","n":2},{"t":"T10","n":1}],"span":[2,4]},{"id":"S22","name":"이소율","grade":"중1","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T2","n":2},{"t":"T5","n":2},{"t":"T10","n":1}],"span":[2,4]},{"id":"S23","name":"박은우","grade":"고2","av":[[8,12],[8,12],[8,12],[8,12],[8,12]],"req":[{"t":"T1","n":2},{"t":"T4","n":2},{"t":"T8","n":1},{"t":"T9","n":1}],"span":[2,4]},{"id":"S24","name":"최예린","grade":"초5","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T1","n":2},{"t":"T5","n":2},{"t":"T8","n":1}],"span":[2,4]},{"id":"S25","name":"정현우","grade":"고2","av":[[8,12],[8,12],[8,12],[8,12],[8,12]],"req":[{"t":"T1","n":2},{"t":"T6","n":2},{"t":"T7","n":1},{"t":"T10","n":1}],"span":[2,4]},{"id":"S26","name":"강나윤","grade":"중3","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T3","n":2},{"t":"T5","n":2}],"span":[2,4]},{"id":"S27","name":"조지훈","grade":"초6","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T2","n":2},{"t":"T6","n":2},{"t":"T9","n":1}],"span":[2,4]},{"id":"S28","name":"윤서윤","grade":"고2","av":[[8,12],[8,12],[8,12],[8,12],[8,12]],"req":[{"t":"T2","n":2},{"t":"T5","n":2}],"span":[2,4]},{"id":"S29","name":"장승민","grade":"초5","av":[[5,12],[5,12],[5,12],[5,12],[5,12]],"req":[{"t":"T2","n":2},{"t":"T4","n":2},{"t":"T10","n":1}],"span":[2,4]},{"id":"S30","name":"임아린","grade":"중1","av":[[7,12],[7,12],[7,12],[7,12],[7,12]],"req":[{"t":"T3","n":2},{"t":"T4","n":2},{"t":"T10","n":1}],"span":[2,4]}],"assign":{"0|8|T10":"S5","0|9|T2":"S5","0|10|T5":"S5","2|9|T4":"S23","2|10|T8":"S23","2|11|T1":"S23","2|9|T9":"S13","2|10|T4":"S13","2|11|T3":"S13","2|9|T6":"S25","2|10|T1":"S25","2|11|T10":"S25","3|8|T7":"S25","3|9|T6":"S25","3|10|T1":"S25","0|9|T10":"S21","0|10|T3":"S21","0|11|T5":"S21","3|9|T4":"S23","3|10|T9":"S23","3|11|T1":"S23","0|7|T10":"S30","0|8|T4":"S30","0|9|T3":"S30","2|9|T8":"S5","2|10|T2":"S5","2|11|T5":"S5","0|9|T4":"S2","0|10|T10":"S2","0|11|T3":"S2","3|9|T1":"S16","3|10|T4":"S16","3|11|T9":"S16","0|8|T3":"S8","0|9|T8":"S8","0|10|T4":"S8","2|8|T4":"S14","2|9|T1":"S14","2|10|T10":"S14","2|9|T10":"S22","2|10|T5":"S22","2|11|T2":"S22","0|6|T10":"S29","0|7|T4":"S29","0|8|T2":"S29","0|9|T5":"S24","0|10|T8":"S24","0|11|T1":"S24","2|8|T1":"S11","2|9|T5":"S11","2|10|T9":"S11","0|5|T10":"S6","0|6|T3":"S6","0|7|T6":"S6","0|6|T7":"S18","0|7|T3":"S18","0|8|T5":"S18","2|9|T2":"S19","2|10|T6":"S19","2|11|T9":"S19","3|7|T5":"S18","3|8|T3":"S18","3|9|T9":"S18","3|6|T5":"S11","3|7|T7":"S11","3|8|T1":"S11","3|6|T7":"S12","3|7|T3":"S12","3|8|T4":"S12","0|6|T6":"S19","0|7|T2":"S19","0|8|T8":"S19","2|8|T6":"S17","2|9|T7":"S17","2|10|T3":"S17","2|7|T6":"S6","2|8|T8":"S6","2|9|T3":"S6","0|5|T6":"S27","0|6|T2":"S27","0|7|T9":"S27","3|8|T5":"S28","3|9|T2":"S28","4|8|T3":"S13","4|9|T4":"S13","4|8|T5":"S28","4|9|T2":"S28","1|10|T3":"S21","1|11|T5":"S21","4|8|T4":"S30","4|9|T3":"S30","2|7|T4":"S8","2|8|T3":"S8","3|7|T1":"S4","3|8|T6":"S4","2|7|T3":"S10","2|8|T5":"S10","1|10|T5":"S26","1|11|T3":"S26","4|9|T5":"S10","4|10|T3":"S10","4|7|T4":"S7","4|8|T2":"S7","3|7|T4":"S7","3|8|T2":"S7","4|9|T1":"S14","4|10|T4":"S14","3|9|T5":"S22","3|10|T2":"S22","1|9|T1":"S16","1|10|T4":"S16","3|9|T3":"S26","3|10|T5":"S26","2|7|T5":"S9","2|8|T2":"S9","1|8|T4":"S2","1|9|T3":"S2","1|9|T5":"S9","1|10|T2":"S9","3|10|T6":"S1","3|11|T2":"S1","4|10|T1":"S4","4|11|T6":"S4","1|9|T2":"S1","1|10|T6":"S1","1|8|T2":"S29","1|9|T4":"S29","2|5|T5":"S20","2|6|T2":"S20","2|5|T3":"S15","2|6|T6":"S15","3|6|T3":"S17","3|7|T6":"S17","0|5|T3":"S3","0|6|T4":"S3","3|5|T6":"S27","3|6|T2":"S27","4|10|T5":"S24","4|11|T1":"S24","4|6|T4":"S3","4|7|T3":"S3","4|10|T6":"S15","4|11|T3":"S15","1|8|T3":"S12","4|10|T2":"S20","4|11|T5":"S20","1|7|T4":"S12"},"sample":false}</script>
+<script id="app">
+{
+const DAYS=['월','화','수','목','금'],ND=5,P=12;
+const fm=p=>{const m=600+50*p;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
+const fmEnd=p=>fm(p+1);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PAL=['#2f7d6d','#3b6fb6','#c07a2c','#7a52a8','#b44a63','#4f8a2f','#2c8aa6'];
+let S;try{S=JSON.parse(document.getElementById('state').textContent||'{}')}catch(e){S={}}
+const CSS=document.getElementById('css').textContent,APP=document.getElementById('app').textContent;
+
+function seed(){
+  let r=7;const rnd=()=>(r=(r*1103515245+12345)%2147483648)/2147483648;
+  const subj=['수학','수학','수학','영어','영어','영어','국어','국어','과학','사회'];
+  const tn=['김서연','이준호','박지민','최유나','정민재','강하은','조현우','윤소희','임도윤','한지수'];
+  const tav=[[3,12],[4,12],[5,12],[2,11],[4,12],[5,12],[3,11],[5,12],[4,12],[5,12]];
+  const teachers=tn.map((n,i)=>({id:'T'+(i+1),name:n,subj:subj[i],av:DAYS.map(()=>tav[i].slice())}));
+  const sn='서준 하윤 도윤 서아 시우 지아 주원 하은 지호 수아 예준 지유 건우 윤서 우진 채원 선우 지안 민준 다은 유준 소율 은우 예린 현우 나윤 지훈 서윤 승민 아린'.split(' ');
+  const fam='김이박최정강조윤장임한오서신권황안송류홍';
+  const grades=['초4','초5','초6','중1','중2','중3','고1','고2'];
+  const students=sn.map((n,i)=>{const g=grades[Math.floor(rnd()*grades.length)];const st=g[0]==='초'?5:g[0]==='중'?7:8;
+    const pool=['수학','영어','국어','과학','사회'];const want=2+Math.floor(rnd()*3);const subs=pool.slice(0,2);while(subs.length<want){const x=pool[2+Math.floor(rnd()*3)];if(!subs.includes(x))subs.push(x)}
+    const req=subs.map((s,k)=>{const c=teachers.filter(t=>t.subj===s);return{t:c[Math.floor(rnd()*c.length)].id,n:k<2?2:1}});
+    return{id:'S'+(i+1),name:fam[i%fam.length]+n,grade:g,av:DAYS.map(()=>[st,12]),req,span:[2,4]}});
+  return{v:1,teachers,students,assign:{},sample:true};
+}
+
+/* ---------- core ---------- */
+const K=(d,p,t)=>d+'|'+p+'|'+t;
+const T=id=>S.teachers.find(t=>t.id===id),ST=id=>S.students.find(s=>s.id===id);
+const inAv=(av,p)=>!!av&&p>=av[0]&&p<av[1];
+function idleOf(arr,allow){const on=[];arr.forEach((v,p)=>{if(v)on.push(p)});if(on.length<2)return{idle:[],cost:0,n:on.length};
+  const idle=[];for(let p=on[0];p<on[on.length-1];p++)if(!arr[p])idle.push(p);return{idle,cost:Math.max(0,idle.length-(allow&&on.length>=5?1:0)),n:on.length}}
+function analyze(st){
+  const A=st.assign,tDay={},sDay={},cnt={},sAt={},bad={},warn={};
+  for(const k in A){const[d,p,t]=k.split('|');const sid=A[k];const s=st.students.find(x=>x.id===sid),te=st.teachers.find(x=>x.id===t);
+    if(!s||!te){bad[k]='없는 데이터';continue}
+    (tDay[t+'|'+d]??=Array(P).fill(0))[p]=1;(sDay[sid+'|'+d]??=Array(P).fill(0))[p]=1;
+    cnt[sid+'|'+t]=(cnt[sid+'|'+t]||0)+1;(sAt[d+'|'+p+'|'+sid]??=[]).push(k);
+    if(!inAv(te.av[d],+p))bad[k]='선생님 근무시간 외';
+    else if(!inAv(s.av[d],+p))warn[k]='학생 가능시간 외';
+    else if(!s.req.some(r=>r.t===t))warn[k]='담당 선생님 아님'}
+  for(const x in sAt)if(sAt[x].length>1)sAt[x].forEach(k=>bad[k]='학생 시간 중복');
+  let need=0,placed=0;const short=[];
+  st.students.forEach(s=>s.req.forEach(r=>{const c=cnt[s.id+'|'+r.t]||0;need+=r.n;placed+=Math.min(c,r.n);if(c!==r.n)short.push({s,r,c})}));
+  let tg=0,sg=0;const tGap={},tBrk={},sGapL=[];
+  for(const x in tDay){const o=idleOf(tDay[x],true);tg+=o.cost;o.idle.forEach((p,i)=>{(i<o.cost?tGap:tBrk)[x+'|'+p]=1})}
+  const sInfo={};let sdOk=0,sdAll=0;
+  for(const x in sDay){const o=idleOf(sDay[x],false);sg+=o.cost;const[sid,d]=x.split('|');if(o.cost)sGapL.push({sid,d:+d,n:o.cost});
+    const s=st.students.find(q=>q.id===sid);const sp=(s&&s.span)||[1,P];const on=sDay[x].map((v,p)=>v?p:-1).filter(p=>p>=0);
+    const stt=o.cost?'gap':o.n<sp[0]?'short':o.n>sp[1]?'over':'ok';sInfo[x]={n:o.n,idle:o.idle,a:on[0],b:on[on.length-1],st:stt};sdAll++;if(stt==='ok')sdOk++}
+  return{tDay,sDay,cnt,bad,warn,need,placed,short,tg,sg,tGap,tBrk,sGapL,sInfo,sdOk,sdAll};
+}
+function autoSchedule(st,mode,R){
+  const base={};
+  if(mode==='fill'){const an=analyze(st);const used={};for(const k in st.assign){if(an.bad[k])continue;const[d,p,t]=k.split('|');const sid=st.assign[k];const s=st.students.find(x=>x.id===sid);const r=s&&s.req.find(q=>q.t===t);if(!r)continue;const c=used[sid+'|'+t]||0;if(c>=r.n)continue;used[sid+'|'+t]=c+1;base[k]=sid}}
+  const tch=Object.fromEntries(st.teachers.map(t=>[t.id,t]));
+  const flex=s=>s.av.reduce((a,v)=>a+(v?v[1]-v[0]:0),0);
+  let best=null;
+  for(let it=0;it<R;it++){
+    const A=Object.assign({},base),tb={},sb={},sd={};
+    const tArr=(t,d)=>tb[t+'|'+d]??=Array(P).fill(0),sArr=(s,d)=>sb[s+'|'+d]??=Array(P).fill(0);
+    const put=(d,p,t,s)=>{A[K(d,p,t)]=s;tArr(t,d)[p]=1;sArr(s,d)[p]=1;sd[s+'|'+t+'|'+d]=1};
+    for(const k in A){const[d,p,t]=k.split('|');put(+d,+p,t,A[k])}
+    const bundles=[];
+    st.students.forEach(s=>{const rem=s.req.map(r=>({t:r.t,n:r.n-Object.keys(A).filter(k=>A[k]===s.id&&k.endsWith('|'+r.t)).length})).filter(r=>r.n>0&&tch[r.t]);
+      const U=rem.reduce((a,r)=>a+r.n,0);if(!U)return;const sp=s.span||[2,4];
+      const k=Math.min(ND,Math.max(Math.ceil(U/sp[1]),...rem.map(r=>r.n)));const bs=Array.from({length:k},()=>[]);
+      rem.slice().sort((a,b)=>b.n-a.n||Math.random()-.5).forEach(r=>{const idx=bs.map((b,i)=>i).sort((a,b)=>bs[a].length-bs[b].length||Math.random()-.5).slice(0,r.n);idx.forEach(i=>bs[i].push(r.t))});
+      bs.filter(b=>b.length).forEach(ts=>bundles.push({s,ts,key:flex(s)+Math.random()*6}))});
+    bundles.sort((a,b)=>b.ts.length-a.ts.length||a.key-b.key);
+    let unmet=0;
+    const gapC=(arr,add,allow)=>{const c=arr.slice();add.forEach(p=>c[p]=1);return idleOf(c,allow).cost-idleOf(arr,allow).cost};
+    const tryPlace=(s,ts)=>{let bp=null,bs=1e9;
+      for(let d=0;d<ND;d++){const av=s.av[d];if(!av)continue;if(ts.some(t=>sd[s.id+'|'+t+'|'+d]))continue;
+        const sa=sArr(s.id,d);const cntDay=sa.filter(Boolean).length,hasDay=cntDay>0;if(hasDay&&cntDay+ts.length>((s.span||[2,4])[1]))continue;
+        for(const pm of perms(ts))for(let p0=av[0];p0+pm.length<=av[1];p0++){let ok=true,sc=0;
+          for(let i=0;i<pm.length&&ok;i++){const p=p0+i,t=pm[i];if(!inAv(tch[t].av[d],p)||tArr(t,d)[p]||sa[p])ok=false;else{const ta=tArr(t,d);sc+=3*gapC(ta,[p],true);if(!ta.some(Boolean))sc+=1.2}}
+          if(!ok)continue;const ps=pm.map((t,i)=>p0+i);sc+=6*gapC(sa,ps,false)+(hasDay?0:.8)+Math.random()*.4;
+          if(sc<bs){bs=sc;bp={d,p0,pm}}}}
+      return bp};
+    for(const b of bundles){const bp=tryPlace(b.s,b.ts);
+      if(bp)bp.pm.forEach((t,i)=>put(bp.d,bp.p0+i,t,b.s.id));
+      else b.ts.forEach(t=>{const one=tryPlace(b.s,[t]);if(one)put(one.d,one.p0,t,b.s.id);else unmet++})}
+    const an=analyze({...st,assign:A});const cost=1000*(an.need-an.placed)+3*an.tg+8*an.sg+4*(an.sdAll-an.sdOk);
+    if(!best||cost<best.cost)best={assign:A,cost};
+  }
+  return best;
+}
+if(!S.teachers){S=seed();S.assign=autoSchedule(S,'all',30).assign}
+else{S.teachers.forEach(t=>t.av=t.av.slice(0,ND));S.students.forEach(s=>{s.av=s.av.slice(0,ND);if(!s.span)s.span=[2,4]});for(const k in S.assign)if(+k.split('|')[0]>=ND)delete S.assign[k]}
+function perms(a){if(a.length<2)return[a];const o=[];a.forEach((x,i)=>perms(a.filter((_,j)=>j!==i)).forEach(r=>o.push([x,...r])));return o}
+
+/* ---------- ui state ---------- */
+let ui={tab:'board',day:(()=>{const x=(new Date().getDay()+6)%7;return x<ND?x:0})(),who:''};
+try{Object.assign(ui,JSON.parse(sessionStorage.getItem('acad-ui')||'{}'))}catch(e){}
+if(ui.day>=ND)ui.day=0;
+const h=location.hash.slice(1);if(h==='board'||h==='info'||h==='person'||h==='flow')ui.tab=h;else if(/^(teacher|student)-[A-Za-z0-9]+$/.test(h)){ui.tab='person';ui.who=h.split('-')[1]}
+let myId=null,userApi=null,names={},desktopApi=null,canEdit=false,mode='checking',artifact=null,saveTimer=null,dirty=false,hist=[];
+const keepUi=()=>{try{sessionStorage.setItem('acad-ui',JSON.stringify(ui))}catch(e){}};
+const root=document.getElementById('root');
+
+function commit(fn,msg){if(!canEdit)return;hist.push(JSON.stringify(S));if(hist.length>40)hist.shift();fn();S.sample=false;if(msg){S.log=[{u:myId,t:Date.now(),m:String(msg)},...(S.log||[])].slice(0,60)}dirty=true;render();queueSave()}
+const LSK='academy-timetable-v1';
+function queueSave(){clearTimeout(saveTimer);if(!artifact&&mode==='local'){try{localStorage.setItem(LSK,JSON.stringify(S));dirty=false}catch(e){}}setStatus();if(!artifact)return;saveTimer=setTimeout(save,2500)}
+function buildDoc(){const j=JSON.stringify(S).replace(/</g,'\\u003c');
+  return '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>학원 시간표</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet"><style id="css">'+CSS+'<\/style></head><body><div id="root"></div>\n<script type="application/json" id="state">'+j+'<\/script>\n<script id="app">'+APP+'<\/script></body></html>'}
+async function save(){if(!artifact||!dirty)return;mode='saving';setStatus();keepUi();
+  try{await artifact.publish(buildDoc());dirty=false;mode='saved'}catch(e){const c=String(e&&(e.code||e.message)||e);if(/not_granted|not_writer/.test(c)){canEdit=false;mode='readonly';render()}else if(/conflict/.test(c)){mode='saved'}else mode='error'}
+  setStatus()}
+function setStatus(){const el=document.getElementById('st');if(!el)return;
+  const m=dirty&&mode!=='saving'?(artifact?'변경 사항 저장 대기 중…':'저장되지 않음 (이 브라우저는 저장소를 막고 있음)'):({checking:'연결 확인 중…',saving:'저장 중…',saved:canEdit?'저장됨 · 모든 화면에 실시간 반영':'보기 전용 · 수정 시 자동 갱신',readonly:'보기 전용 · 수정 시 자동 갱신',error:'저장 실패 · 잠시 후 다시 수정해 주세요',local:'이 기기에 자동 저장됨'})[mode];
+  el.className='status'+(dirty||mode==='saving'||mode==='error'?' busy':'');el.innerHTML='<i class="dot"></i><span></span>';el.querySelector('span').textContent=m}
+
+/* ---------- render ---------- */
+const colorOf=t=>{const subs=[...new Set(S.teachers.map(x=>x.subj))];return PAL[Math.max(0,subs.indexOf(t?.subj))%PAL.length]};
+const avTxt=av=>av?fm(av[0])+'–'+fmEnd(av[1]-1):'휴무';
+function render(){const an=analyze(S);keepUi();
+  const conf=Object.keys(an.bad).length,warnN=Object.keys(an.warn).length;
+  root.innerHTML=`<header><div class="top"><h1>학원 시간표</h1><div id="st" class="status"></div></div>
+  <div class="kpis"><div class="kpi ${an.placed<an.need?'bad':''}"><b class="num">${an.placed}/${an.need}</b><span>배정된 주간 수업</span></div>
+  <div class="kpi ${an.tg?'bad':''}"><b class="num">${an.tg}</b><span>선생님 공강(교시)</span></div>
+  <div class="kpi ${an.sdOk<an.sdAll?'bad':''}"><b class="num">${an.sdOk}/${an.sdAll}</b><span>학생 연강 정상(등원일 기준)</span></div>
+  <div class="kpi ${conf?'bad':''}"><b class="num">${conf}</b><span>충돌${warnN?' · 주의 '+warnN:''}</span></div></div>
+  <nav>${[['board','주간 보드'],['flow','연강·공강 현황'],['person','개인별 시간표'],['info','선생님·학생 정보']].map(([k,l])=>`<button data-tab="${k}" aria-current="${ui.tab===k}">${l}</button>`).join('')}</nav></header><main id="m"></main>`;
+  setStatus();const m=document.getElementById('m');
+  if(ui.tab==='board')m.innerHTML=boardHTML(an);else if(ui.tab==='flow')m.innerHTML=flowHTML(an);else if(ui.tab==='person')m.innerHTML=personHTML(an);else m.innerHTML=infoHTML();
+  wire(an);fillNames()}
+function boardHTML(an){const d=ui.day;
+  const head=S.teachers.map(t=>{const arr=an.tDay[t.id+'|'+d];let real='';if(arr){const on=arr.map((v,p)=>v?p:-1).filter(p=>p>=0);real='실근무 '+fm(on[0])+'–'+fmEnd(on[on.length-1])}
+    return`<th><span style="color:${colorOf(t)}">●</span> ${esc(t.name)}<small>${esc(t.subj)} · 출근 ${avTxt(t.av[d])}</small><small>${real||'수업 없음'}</small></th>`}).join('');
+  const rows=Array.from({length:P},(_,p)=>`<tr><th class="time"><b>${fm(p)}</b><small>~${fmEnd(p)}</small></th>${S.teachers.map(t=>{const k=K(d,p,t.id),sid=S.assign[k],s=sid&&ST(sid);
+    const off=!inAv(t.av[d],p);let cls=off?'off':'',inner='';
+    if(s){cls+=an.bad[k]?' bad':an.warn[k]?' warn':'';inner=`<span class="chip" style="--c:${colorOf(t)}">${esc(s.name)}<small>${esc(s.grade)}${an.bad[k]||an.warn[k]?' · '+esc(an.bad[k]||an.warn[k]):''}</small></span>`}
+    else if(an.tGap[t.id+'|'+d+'|'+p]){cls+=' gap';inner='공강'}else if(an.tBrk[t.id+'|'+d+'|'+p]){cls+=' brk';inner='휴게'}
+    return`<td class="${cls}"><button data-cell="${k}" ${off&&!s?'tabindex="-1" aria-label="근무시간 외"':''}>${inner}</button></td>`}).join('')}</tr>`).join('');
+  return`<div class="bar"><div class="days">${DAYS.map((x,i)=>`<button data-day="${i}" aria-pressed="${i===d}">${x}</button>`).join('')}</div><span class="spacer"></span>
+  ${canEdit?`<button class="btn pri" id="autoFill">남은 수업 자동 배정</button><button class="btn" id="autoAll">전체 재배정</button><button class="btn" id="undo" ${hist.length?'':'disabled'}>실행 취소</button>`:''}<span class="prog" id="prog"></span></div>
+  <div class="cols"><div><div class="scroll"><table class="board"><thead><tr><th class="time">교시</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="legend"><span><i style="background:repeating-linear-gradient(135deg,var(--off) 0 4px,transparent 4px 8px);border:1px solid var(--line)"></i>근무시간 외</span><span><i style="outline:2px dashed var(--coral);outline-offset:-2px"></i>공강(빈 시간)</span><span><i style="outline:2px dashed var(--mute);outline-offset:-2px"></i>휴게(5교시 이상 근무 시 1교시 허용)</span><span><i style="box-shadow:inset 0 0 0 2px var(--coral)"></i>충돌</span><span><i style="box-shadow:inset 0 0 0 2px #e3a33a"></i>주의</span></div>
+  ${canEdit?'<p class="note">수업 칸을 <b>끌어서 다른 칸에 놓으면</b> 이동하고, 이미 수업이 있는 칸에 놓으면 두 학생 자리가 바뀝니다. 휴대폰은 <b>길게 누른 뒤</b> 끌어 주세요. 요일 버튼 위에 잠시 머무르면 다른 요일로 옮길 수 있습니다. 빈 칸은 눌러서 학생을 배정합니다. 수업 40분 + 상담 10분 = 1교시(50분).</p>':''}</div>
+  ${sidePanel(an)}</div>`}
+function sidePanel(an){
+  const sh=an.short.slice(0,12).map(x=>`<li><span>${esc(x.s.name)} · ${esc(T(x.r.t)?.name||'?')}</span><span class="tag">${x.c}/${x.r.n}회</span></li>`).join('');
+  const LB={gap:'끊김',short:'연강 미달',over:'연강 초과'};const sg=Object.entries(an.sInfo).filter(([k,v])=>v.st!=='ok').slice(0,12).map(([k,v])=>{const[sid,d]=k.split('|');return`<li><span>${esc(ST(sid)?.name)} · ${DAYS[d]} ${v.n}연강</span><span class="tag">${LB[v.st]}${v.st==='gap'?' '+v.idle.length+'교시':''}</span></li>`}).join('');
+  const tg=S.teachers.map(t=>{let n=0;DAYS.forEach((_,d)=>{const a=an.tDay[t.id+'|'+d];if(a)n+=idleOf(a,true).cost});return{t,n}}).filter(x=>x.n).sort((a,b)=>b.n-a.n).map(x=>`<li><span>${esc(x.t.name)}</span><span class="tag">주 ${x.n}교시</span></li>`).join('');
+  return`<aside class="panel"><h3>조정 필요 항목</h3>
+  <p class="note">미배정·초과 수업</p><ul class="list">${sh||'<li class="ok">모두 배정됨</li>'}</ul>
+  <p class="note">학생 연강 이상</p><ul class="list">${sg||'<li class="ok">모든 학생 연강 정상</li>'}</ul>
+  <p class="note">선생님 공강 합계</p><ul class="list">${tg||'<li class="ok">공강 없음</li>'}</ul>
+  <h3 style="margin-top:16px">최근 변경</h3><ul class="list">${(S.log||[]).slice(0,8).map(l=>`<li style="display:block"><span>${esc(l.m)}</span><small class="note" style="display:block"><span class="who" data-uid="${esc(l.u||'')}">${l.u?'':(userApi?'알 수 없음':'이 기기')}</span> · ${ago(l.t)}</small></li>`).join('')||'<li class="note">아직 기록이 없습니다.</li>'}</ul></aside>`}
+const ago=t=>{const m=Math.round((Date.now()-t)/60000);if(m<1)return'방금';if(m<60)return m+'분 전';const h=Math.round(m/60);if(h<24)return h+'시간 전';const d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate()};
+async function fillNames(){const els=[...document.querySelectorAll('.who[data-uid]')].filter(e=>e.dataset.uid);if(!els.length)return;
+  if(!userApi){els.forEach(e=>e.textContent='이 기기');return}
+  try{const ids=[...new Set(els.map(e=>e.dataset.uid))];const ps=await userApi.profiles(ids);els.forEach(e=>{const p=ps&&ps[e.dataset.uid];e.textContent=e.dataset.uid===myId?'나':(p&&p.name)||'다른 사용자'})}catch(x){}}
+function strip(arr,av,idle,colorAt){return`<span class="strip">${Array.from({length:P},(_,p)=>{const c=arr&&arr[p]?colorAt(p):'';const g=idle&&idle.includes(p);return`<i class="${c?'on':g?'g':!inAv(av,p)?'x':''}" ${c?`style="--c:${c}"`:''}></i>`}).join('')}</span>`}
+function flowHTML(an){const isS=(ui.fs||'s')==='s';const only=!!ui.fo;
+  const LBL={ok:'',gap:'끊김',short:'연강 미달',over:'연강 초과'};
+  const head=`<tr><th class="time" style="text-align:left">${isS?'학생':'선생님'}</th>${DAYS.map(x=>`<th>${x}</th>`).join('')}</tr>`;
+  let rows;
+  if(isS){rows=S.students.map(s=>{let bad=false;const cells=DAYS.map((_,d)=>{const inf=an.sInfo[s.id+'|'+d];if(!inf)return`<td><div class="fc">${strip(null,s.av[d],null,()=>'')}<small>없음</small></div></td>`;
+      if(inf.st!=='ok')bad=true;const ca=p=>{for(const t of S.teachers)if(S.assign[K(d,p,t.id)]===s.id)return colorOf(t);return'#888'};
+      return`<td class="${inf.st!=='ok'?'fbad':''}"><div class="fc">${strip(an.sDay[s.id+'|'+d],s.av[d],inf.idle,ca)}<small><b class="num">${fm(inf.a)}–${fmEnd(inf.b)}</b> · ${inf.n}연강${inf.st!=='ok'?` <span class="tag">${LBL[inf.st]}</span>`:''}</small></div></td>`}).join('');
+      if(only&&!bad)return'';return`<tr><th class="time" style="text-align:left"><button class="lnk" data-go="${s.id}">${esc(s.name)}</button><small>${esc(s.grade)} · ${(s.span||[2,4]).join('~')}연강</small></th>${cells}</tr>`}).join('')}
+  else{rows=S.teachers.map(t=>{let bad=false;const cells=DAYS.map((_,d)=>{const arr=an.tDay[t.id+'|'+d];if(!arr)return`<td><div class="fc">${strip(null,t.av[d],null,()=>'')}<small>수업 없음</small></div></td>`;
+      const o=idleOf(arr,true);if(o.cost)bad=true;const on=arr.map((v,p)=>v?p:-1).filter(p=>p>=0);
+      return`<td class="${o.cost?'fbad':''}"><div class="fc">${strip(arr,t.av[d],o.idle.slice(0,o.cost),()=>colorOf(t))}<small><b class="num">${fm(on[0])}–${fmEnd(on[on.length-1])}</b> · ${o.n}교시${o.cost?` <span class="tag">공강 ${o.cost}</span>`:o.idle.length?' · 휴게 1':''}</small></div></td>`}).join('');
+      if(only&&!bad)return'';return`<tr><th class="time" style="text-align:left"><button class="lnk" data-go="${t.id}">${esc(t.name)}</button><small>${esc(t.subj)}</small></th>${cells}</tr>`}).join('')}
+  return`<div class="bar"><div class="days"><button data-fs="s" aria-pressed="${isS}">학생</button><button data-fs="t" aria-pressed="${!isS}">선생님</button></div>
+  <div class="days"><button data-fo="0" aria-pressed="${!only}">전체</button><button data-fo="1" aria-pressed="${only}">문제만</button></div><span class="spacer"></span>
+  ${canEdit?`<button class="btn pri" id="autoFill">남은 수업 자동 배정</button><button class="btn" id="autoAll">전체 재배정</button>`:''}<span class="prog" id="prog"></span></div>
+  <p class="note">막대 12칸 = 10:00~20:00 교시. 색칸 = 수업, <span style="color:var(--coral)">코랄칸</span> = 수업 사이 빈 시간, 빗금 = 등원·출근 시간 외. 이름을 누르면 개인 시간표로 이동합니다.</p>
+  <div class="scroll"><table class="board flow"><thead>${head}</thead><tbody>${rows||`<tr><td colspan="${ND+1}" style="padding:16px" class="ok">문제 있는 ${isS?'학생':'선생님'}이 없습니다.</td></tr>`}</tbody></table></div>`}
+function personHTML(an){
+  if(!ui.who||(!T(ui.who)&&!ST(ui.who)))ui.who=S.teachers[0]?.id||'';
+  const isT=!!T(ui.who),P0=isT?T(ui.who):ST(ui.who);
+  const opts=`<optgroup label="선생님">${S.teachers.map(t=>`<option value="${t.id}" ${t.id===ui.who?'selected':''}>${esc(t.name)} (${esc(t.subj)})</option>`).join('')}</optgroup><optgroup label="학생">${S.students.map(s=>`<option value="${s.id}" ${s.id===ui.who?'selected':''}>${esc(s.name)} (${esc(s.grade)})</option>`).join('')}</optgroup>`;
+  const cellOf=(d,p)=>{if(isT){const sid=S.assign[K(d,p,P0.id)];if(sid)return`<span class="chip" style="--c:${colorOf(P0)}">${esc(ST(sid)?.name)}<small>${esc(ST(sid)?.grade)}</small></span>`;return''}
+    for(const t of S.teachers)if(S.assign[K(d,p,t.id)]===P0.id)return`<span class="chip" style="--c:${colorOf(t)}">${esc(t.subj)}<small>${esc(t.name)} 선생님</small></span>`;return''};
+  const avOf=d=>P0.av[d];
+  const rows=Array.from({length:P},(_,p)=>`<tr><th class="time"><b>${fm(p)}</b></th>${DAYS.map((_,d)=>{const c=cellOf(d,p);const gap=isT&&an.tGap[P0.id+'|'+d+'|'+p];return`<td class="${!c&&!inAv(avOf(d),p)?'off':''}${gap?' gap':''}"><button tabindex="-1">${c||(gap?'공강':'')}</button></td>`}).join('')}</tr>`).join('');
+  const sum=DAYS.map((x,d)=>{const arr=isT?an.tDay[P0.id+'|'+d]:an.sDay[P0.id+'|'+d];if(!arr)return`<li><span>${x}</span><span class="note">없음</span></li>`;const on=arr.map((v,p)=>v?p:-1).filter(p=>p>=0);
+    return`<li><span>${x} <span class="num">${fm(on[0])}–${fmEnd(on[on.length-1])}</span></span><span class="note">${on.length}교시${isT?'':' · 하원 '+fmEnd(on[on.length-1])}</span></li>`}).join('');
+  return`<div class="bar"><select id="who" aria-label="사람 선택">${opts}</select><span class="spacer"></span><button class="btn" id="copyLink">이 시간표 링크 복사</button><span class="prog" id="prog"></span></div>
+  <div class="cols"><div class="scroll"><table class="board"><thead><tr><th class="time">교시</th>${DAYS.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+  <aside class="panel"><h3>${esc(P0.name)} ${isT?'선생님':'학생'}</h3><p class="note">${isT?esc(P0.subj)+' · 요일별 실제 수업 시간(권장 출퇴근)':esc(P0.grade)+' · 요일별 등원~하원'}</p><ul class="list">${sum}</ul>
+  ${!isT?`<p class="note" style="margin-top:12px">수강: ${P0.req.map(r=>esc(T(r.t)?.subj+' '+T(r.t)?.name)+' 주'+r.n+'회').join(', ')}</p>`:''}</aside></div>`}
+function avRow(pfx,i,d,av){const so=`<option value="-1" ${!av?'selected':''}>휴무</option>`+Array.from({length:P},(_,p)=>`<option value="${p}" ${av&&av[0]===p?'selected':''}>${fm(p)}</option>`).join('');
+  const eo=Array.from({length:P},(_,p)=>`<option value="${p+1}" ${av&&av[1]===p+1?'selected':''}>${fmEnd(p)}</option>`).join('');
+  return`<div class="row"><label>${DAYS[d]}</label><select data-av="${pfx}|${i}|${d}|0" ${canEdit?'':'disabled'} aria-label="${DAYS[d]} 시작">${so}</select>~<select data-av="${pfx}|${i}|${d}|1" ${!av||!canEdit?'disabled':''} aria-label="${DAYS[d]} 종료">${eo}</select></div>`}
+function infoHTML(){const dis=canEdit?'':'disabled';
+  const tl=S.teachers.map((t,i)=>`<details class="rec"><summary><b>${esc(t.name)}</b><span>${esc(t.subj)} · 월 ${avTxt(t.av[0])}</span></summary><div class="recbody">
+   <div class="row"><input data-f="t|${i}|name" value="${esc(t.name)}" aria-label="이름" ${dis}><input data-f="t|${i}|subj" value="${esc(t.subj)}" aria-label="과목" style="width:110px" ${dis}>${canEdit?`<button class="btn" data-copy="t|${i}">월요일 시간을 평일 전체에 적용</button><button class="btn warn" data-del="t|${i}">삭제</button>`:''}</div>
+   <div class="daygrid">${DAYS.map((_,d)=>avRow('t',i,d,t.av[d])).join('')}</div></div></details>`).join('');
+  const sl=S.students.map((s,i)=>`<details class="rec"><summary><b>${esc(s.name)}</b><span>${esc(s.grade)} · 하루 ${(s.span||[2,4])[0]}~${(s.span||[2,4])[1]}연강 · ${s.req.map(r=>esc(T(r.t)?.subj||'?')+' '+r.n+'회').join(', ')}</span></summary><div class="recbody">
+   <div class="row"><input data-f="s|${i}|name" value="${esc(s.name)}" aria-label="이름" ${dis}><input data-f="s|${i}|grade" value="${esc(s.grade)}" aria-label="학년" style="width:80px" ${dis}>${canEdit?`<button class="btn" data-copy="s|${i}">월요일 시간을 평일 전체에 적용</button><button class="btn warn" data-del="s|${i}">삭제</button>`:''}</div>
+   <div class="row"><label style="min-width:auto">하루 연강</label><input type="number" min="1" max="6" value="${(s.span||[2,4])[0]}" data-sp="${i}|0" ${dis} aria-label="최소 연강">~<input type="number" min="1" max="6" value="${(s.span||[2,4])[1]}" data-sp="${i}|1" ${dis} aria-label="최대 연강">교시</div>
+   <p class="note" style="margin:0">담당 선생님 · 주간 횟수 (같은 선생님 수업은 하루 1회, 요일별로 나눠 배정)</p>
+   ${s.req.map((r,j)=>`<div class="row"><select data-rq="${i}|${j}|t" ${dis} aria-label="담당 선생님">${S.teachers.map(t=>`<option value="${t.id}" ${t.id===r.t?'selected':''}>${esc(t.name)} (${esc(t.subj)})</option>`).join('')}</select><input type="number" min="1" max="6" value="${r.n}" data-rq="${i}|${j}|n" ${dis} aria-label="주간 횟수">회 ${canEdit?`<button class="btn warn" data-rqdel="${i}|${j}">빼기</button>`:''}</div>`).join('')}
+   ${canEdit?`<div class="row"><button class="btn" data-rqadd="${i}">과목 추가</button></div>`:''}
+   <p class="note" style="margin:0">등원 가능 시간</p><div class="daygrid">${s.av.map((a,d)=>avRow('s',i,d,a)).join('')}</div></div></details>`).join('');
+  return`<div class="two"><section><h2>선생님 ${S.teachers.length}명</h2>${canEdit?'<div class="bar"><button class="btn" id="addT">선생님 추가</button></div>':''}${tl}</section>
+  <section><h2>학생 ${S.students.length}명</h2>${canEdit?'<div class="bar"><button class="btn" id="addS">학생 추가</button></div>':''}${sl}</section></div>
+  <section class="panel" style="margin-top:18px"><h3>백업 · 앱 설치</h3>
+  ${mode==='local'?`<p class="note">이 파일 버전은 데이터를 <b>이 기기 브라우저</b>에 저장합니다. 다른 기기로 옮기거나 보관하려면 백업 파일을 내보내고 불러오세요.</p>
+  <div class="row"><button class="btn" id="expJ">백업 내보내기(.json)</button><label class="btn" style="display:inline-flex;align-items:center">백업 불러오기<input type="file" id="impJ" accept=".json,application/json" hidden></label><button class="btn warn" id="resetS">예시 데이터로 초기화</button></div>`
+  :`<p class="note">Claude에 게시된 버전은 편집 권한이 있는 사람이 수정하면 모든 화면에 실시간으로 반영됩니다. 누가 무엇을 바꿨는지는 주간 보드 오른쪽 '최근 변경'에서 확인할 수 있습니다.</p>`}
+  ${desktopApi?'<div class="row" style="margin-top:8px"><button class="btn pri" id="instD">데스크톱 앱으로 설치</button></div>':''}<p class="note" id="bk"></p></section>
+  <p class="note">출근시간·등원시간을 바꾸면 보드에서 맞지 않는 칸이 즉시 충돌로 표시됩니다. 주간 보드의 '남은 수업 자동 배정'을 누르면 충돌 칸만 다시 맞춥니다.${S.sample?' 현재는 예시 데이터입니다.':''}</p>`}
+
+function openCell(k){if(!canEdit)return;const[d,p,t]=k.split('|');const te=T(t);const cur=S.assign[k];const an=analyze(S);
+  if(!inAv(te.av[d],+p)&&!cur)return;
+  const busyAt=sid=>S.teachers.some(x=>x.id!==t&&S.assign[K(d,p,x.id)]===sid);
+  const sameDay=sid=>Array.from({length:P},(_,q)=>q).some(q=>q!=p&&S.assign[K(d,q,t)]===sid);
+  const item=s=>{const r=s.req.find(q=>q.t===t);const c=an.cnt[s.id+'|'+t]||0;const tags=[];
+    if(busyAt(s.id))tags.push(['x','이 시간 다른 수업']);if(!inAv(s.av[d],+p))tags.push(['x','등원 시간 외']);if(sameDay(s.id))tags.push(['x','같은 날 이미 배정']);
+    if(r)tags.push(['',c+'/'+r.n+'회']);
+    return`<button class="pick ${s.id===cur?'cur':''}" data-pick="${s.id}"><span>${esc(s.name)} <span class="note">${esc(s.grade)}</span></span><span>${tags.map(([c2,x])=>`<em class="${c2}">${x}</em>`).join(' ')}</span></button>`};
+  const mine=S.students.filter(s=>s.req.some(r=>r.t===t)),others=S.students.filter(s=>!s.req.some(r=>r.t===t));
+  const el=document.createElement('div');el.className='sheet';
+  el.innerHTML=`<div role="dialog" aria-modal="true" aria-label="수업 배정"><h2>${DAYS[d]} ${fm(+p)} · ${esc(te.name)} 선생님</h2>
+   ${cur?`<button class="btn warn" data-pick="" style="width:100%;margin-bottom:12px">이 칸 비우기</button>`:''}
+   <p class="note">담당 학생</p>${mine.map(item).join('')||'<p class="note">담당 학생이 없습니다.</p>'}
+   <details><summary class="note" style="padding:10px 0;cursor:pointer">다른 학생 ${others.length}명</summary>${others.map(item).join('')}</details>
+   <button class="btn" id="closeSheet" style="width:100%;margin-top:10px">닫기</button></div>`;
+  document.body.appendChild(el);const close=()=>el.remove();
+  el.addEventListener('click',e=>{if(e.target===el||e.target.id==='closeSheet')return close();const b=e.target.closest('[data-pick]');if(!b)return;const sid=b.dataset.pick;
+    close();commit(()=>{if(sid)S.assign[k]=sid;else delete S.assign[k]},`${DAYS[d]} ${fm(+p)} ${te.name}: `+(sid?`${ST(sid)?.name||''} 배정`:`${ST(cur)?.name||''} 비움`))});
+  el.querySelector('button')?.focus()}
+
+function runAuto(md){const pr=document.getElementById('prog');if(pr)pr.textContent='최적안 계산 중…';
+  setTimeout(()=>{const r=autoSchedule(S,md,md==='all'?40:25);commit(()=>{S.assign=r.assign},md==='all'?'전체 재배정':'남은 수업 자동 배정')},30)}
+function wire(an){
+  root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{ui.tab=b.dataset.tab;history.replaceState(null,'','#'+ui.tab);render()});
+  root.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{ui.day=+b.dataset.day;render()});
+  root.querySelectorAll('[data-cell]').forEach(b=>b.onclick=()=>{if(Date.now()-dragEndAt<400)return;openCell(b.dataset.cell)});
+  const g=id=>document.getElementById(id);
+  if(g('autoFill'))g('autoFill').onclick=()=>runAuto('fill');
+  if(g('autoAll'))g('autoAll').onclick=()=>runAuto('all');
+  if(g('undo'))g('undo').onclick=()=>{if(!hist.length)return;S=JSON.parse(hist.pop());S.log=[{u:myId,t:Date.now(),m:'실행 취소'},...(S.log||[])].slice(0,60);dirty=true;render();queueSave()};
+  if(g('who'))g('who').onchange=e=>{ui.who=e.target.value;history.replaceState(null,'','#'+(T(ui.who)?'teacher-':'student-')+ui.who);render()};
+  if(g('copyLink'))g('copyLink').onclick=async e=>{const h2='#'+(T(ui.who)?'teacher-':'student-')+ui.who;history.replaceState(null,'','#'+h2.slice(1));
+    try{await navigator.clipboard.writeText(location.href.split('#')[0]+h2);g('prog').textContent='링크를 복사했습니다'}catch(x){g('prog').textContent='주소창의 링크를 복사해 주세요'}};
+  root.querySelectorAll('[data-f]').forEach(inp=>inp.onchange=()=>{const[w,i,f]=inp.dataset.f.split('|');commit(()=>{(w==='t'?S.teachers:S.students)[i][f]=inp.value.trim()||'이름 없음'},'정보 수정: '+(inp.value.trim()||'이름 없음'))});
+  root.querySelectorAll('[data-av]').forEach(sel=>sel.onchange=()=>{const[w,i,d,e]=sel.dataset.av.split('|');const o=(w==='t'?S.teachers:S.students)[i];const v=+sel.value;
+    commit(()=>{if(e==='0'){if(v<0)o.av[d]=null;else{const end=o.av[d]?Math.max(o.av[d][1],v+1):P;o.av[d]=[v,end]}}else{o.av[d][1]=Math.max(v,o.av[d][0]+1)}},`${o.name} ${DAYS[d]} 시간 변경`)});
+  root.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const[w,i]=b.dataset.copy.split('|');const o=(w==='t'?S.teachers:S.students)[i];commit(()=>{for(let d=1;d<ND;d++)o.av[d]=o.av[0]?o.av[0].slice():null})});
+  root.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const[w,i]=b.dataset.del.split('|');commit(()=>{const arr=w==='t'?S.teachers:S.students;const id=arr[i].id;arr.splice(i,1);
+    for(const k in S.assign){if(w==='t'?k.endsWith('|'+id):S.assign[k]===id)delete S.assign[k]}if(w==='t')S.students.forEach(s=>s.req=s.req.filter(r=>r.t!==id))})});
+  root.querySelectorAll('[data-rq]').forEach(x=>x.onchange=()=>{const[i,j,f]=x.dataset.rq.split('|');commit(()=>{S.students[i].req[j][f]=f==='n'?Math.max(1,Math.min(6,+x.value||1)):x.value})});
+  root.querySelectorAll('[data-sp]').forEach(x=>x.onchange=()=>{const[i,j]=x.dataset.sp.split('|');commit(()=>{const sp=S.students[i].span||=[2,4];sp[j]=Math.max(1,Math.min(6,+x.value||1));if(sp[0]>sp[1])sp[j?0:1]=sp[j]})});
+  root.querySelectorAll('[data-fs]').forEach(b=>b.onclick=()=>{ui.fs=b.dataset.fs;render()});
+  root.querySelectorAll('[data-fo]').forEach(b=>b.onclick=()=>{ui.fo=b.dataset.fo==='1';render()});
+  root.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{ui.tab='person';ui.who=b.dataset.go;render()});
+  root.querySelectorAll('[data-rqdel]').forEach(b=>b.onclick=()=>{const[i,j]=b.dataset.rqdel.split('|');commit(()=>S.students[i].req.splice(j,1))});
+  root.querySelectorAll('[data-rqadd]').forEach(b=>b.onclick=()=>commit(()=>S.students[b.dataset.rqadd].req.push({t:S.teachers[0].id,n:1})));
+  const nid=(arr,p)=>p+(Math.max(0,...arr.map(x=>+x.id.slice(1)||0))+1);
+  if(g('expJ'))g('expJ').onclick=()=>{const bl=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download='학원시간표_백업_'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+  if(g('impJ'))g('impJ').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!o.teachers||!o.students||!o.assign)throw 0;commit(()=>{S=o;S.teachers.forEach(t=>t.av=t.av.slice(0,ND));S.students.forEach(s=>{s.av=s.av.slice(0,ND);if(!s.span)s.span=[2,4]})})}catch(x){g('bk').textContent='백업 파일 형식이 올바르지 않습니다.'}};
+  if(g('resetS'))g('resetS').onclick=()=>{if(g('resetS').dataset.ok){commit(()=>{S=seed();S.assign=autoSchedule(S,'all',30).assign})}else{g('resetS').dataset.ok=1;g('resetS').textContent='한 번 더 누르면 초기화'}};
+  if(g('instD'))g('instD').onclick=async()=>{try{await desktopApi.install.request()}catch(x){g('bk').textContent='설치를 시작하지 못했습니다.'}};
+  if(g('addT'))g('addT').onclick=()=>commit(()=>S.teachers.push({id:nid(S.teachers,'T'),name:'새 선생님',subj:'과목',av:DAYS.map(()=>[0,12])}));
+  if(g('addS'))g('addS').onclick=()=>commit(()=>S.students.push({id:nid(S.students,'S'),name:'새 학생',grade:'',av:DAYS.map(()=>[6,12]),req:[],span:[2,4]}));
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelector('.sheet')?.remove();if(drag)endDrag(true)}});
+/* ---------- drag & drop ---------- */
+let drag=null,ghost=null,pend=null,dragEndAt=0;
+const cellAt=(x,y)=>{const el=document.elementFromPoint(x,y);return{btn:el&&el.closest('td button[data-cell]'),day:el&&el.closest('[data-day]')}};
+function judge(tk){if(!tk||tk===drag.k)return null;const[d,p,t]=tk.split('|');const te=T(t),s=ST(drag.sid);
+  if(!te||!inAv(te.av[d],+p))return['no','선생님 근무시간 외 — 놓을 수 없음'];
+  const other=S.assign[tk];
+  if(S.teachers.some(x=>{const kk=K(d,p,x.id);return kk!==tk&&kk!==drag.k&&S.assign[kk]===drag.sid}))return['warn','이 시간 다른 수업과 중복'];
+  if(!inAv(s.av[d],+p))return['warn','학생 등원 시간 외'];
+  if(!s.req.some(r=>r.t===t))return['warn','담당 선생님이 아님'];
+  if(other){const o=ST(other);return['ok',(o?o.name:'')+' 학생과 자리 바꾸기']}
+  return['ok',DAYS[d]+' '+fm(+p)+' · '+te.name+' 선생님으로 이동']}
+function startDrag(k,x,y){const sid=S.assign[k];if(!sid||!canEdit)return;drag={k,sid,tk:null,res:null,dayT:null,dayH:null};
+  ghost=document.createElement('div');ghost.className='ghost';ghost.innerHTML='<b></b><small></small>';ghost.querySelector('b').textContent=ST(sid)?.name||'';
+  document.body.appendChild(ghost);document.body.classList.add('dragging');
+  document.querySelector(`[data-cell="${k}"]`)?.closest('td').classList.add('dsrc');try{navigator.vibrate&&navigator.vibrate(15)}catch(e){}moveDrag(x,y)}
+function moveDrag(x,y){ghost.style.transform=`translate(${x+14}px,${y+14}px)`;const{btn,day}=cellAt(x,y);
+  document.querySelectorAll('.dz-ok,.dz-warn,.dz-no').forEach(e=>e.classList.remove('dz-ok','dz-warn','dz-no'));
+  drag.tk=btn?btn.dataset.cell:null;drag.res=judge(drag.tk);
+  if(btn&&drag.res)btn.closest('td').classList.add('dz-'+drag.res[0]);
+  ghost.className='ghost'+(drag.res?' g-'+drag.res[0]:'');ghost.querySelector('small').textContent=drag.res?drag.res[1]:(day?'잠시 머무르면 '+day.textContent+'요일로 전환':'놓을 칸으로 이동하세요');
+  const dd=day?+day.dataset.day:null;if(dd!==drag.dayH){clearTimeout(drag.dayT);drag.dayH=dd;if(dd!==null&&dd!==ui.day)drag.dayT=setTimeout(()=>{ui.day=dd;render();document.querySelector(`[data-cell="${drag?.k}"]`)?.closest('td').classList.add('dsrc')},450)}
+  const sc=document.querySelector('.board')?.closest('.scroll');if(sc){const r=sc.getBoundingClientRect();if(y>r.top&&y<r.bottom){if(x<r.left+48)sc.scrollLeft-=14;else if(x>r.right-48)sc.scrollLeft+=14}}
+  if(y<60)window.scrollBy(0,-14);else if(y>innerHeight-60)window.scrollBy(0,14)}
+function endDrag(cancel){if(!drag)return;const{k,sid,tk,res}=drag;clearTimeout(drag.dayT);drag=null;dragEndAt=Date.now();
+  ghost?.remove();ghost=null;document.body.classList.remove('dragging');document.querySelectorAll('.dz-ok,.dz-warn,.dz-no,.dsrc').forEach(e=>e.classList.remove('dz-ok','dz-warn','dz-no','dsrc'));
+  if(cancel||!tk||!res||res[0]==='no')return;
+  const[d1,p1]=k.split('|'),[d2,p2,t2]=tk.split('|');const ot=S.assign[tk];
+  commit(()=>{const other=S.assign[tk];S.assign[tk]=sid;if(other)S.assign[k]=other;else delete S.assign[k]},`${ST(sid)?.name||''} ${DAYS[d1]} ${fm(+p1)} → ${DAYS[d2]} ${fm(+p2)} (${T(t2)?.name||''})`+(ot?` · ${ST(ot)?.name||''}와 교환`:''))}
+document.addEventListener('mousedown',e=>{if(e.button!==0||!canEdit)return;const b=e.target.closest('td button[data-cell]');if(!b||!S.assign[b.dataset.cell])return;pend={k:b.dataset.cell,x:e.clientX,y:e.clientY};e.preventDefault()});
+document.addEventListener('mousemove',e=>{if(drag)return moveDrag(e.clientX,e.clientY);if(pend&&Math.hypot(e.clientX-pend.x,e.clientY-pend.y)>5){startDrag(pend.k,e.clientX,e.clientY);pend=null}});
+document.addEventListener('mouseup',()=>{pend=null;if(drag)endDrag(false)});
+let lp=null;
+document.addEventListener('touchstart',e=>{if(!canEdit||e.touches.length>1)return;const b=e.target.closest('td button[data-cell]');if(!b||!S.assign[b.dataset.cell])return;const t=e.touches[0];
+  lp={x:t.clientX,y:t.clientY,k:b.dataset.cell,timer:setTimeout(()=>{if(lp){startDrag(lp.k,lp.x,lp.y);lp=null}},320)}},{passive:true});
+document.addEventListener('touchmove',e=>{const t=e.touches[0];if(drag){e.preventDefault();moveDrag(t.clientX,t.clientY);return}
+  if(lp&&Math.hypot(t.clientX-lp.x,t.clientY-lp.y)>8){clearTimeout(lp.timer);lp=null}else if(lp){lp.x=t.clientX;lp.y=t.clientY}},{passive:false});
+document.addEventListener('touchend',e=>{if(lp){clearTimeout(lp.timer);lp=null}if(drag){e.preventDefault();endDrag(false)}},{passive:false});
+document.addEventListener('touchcancel',()=>{if(lp){clearTimeout(lp.timer);lp=null}if(drag)endDrag(true)});
+window.addEventListener('hashchange',()=>{const x=location.hash.slice(1);if(/^(teacher|student)-/.test(x)){ui.tab='person';ui.who=x.split('-')[1];render()}});
+
+render();
+(async()=>{try{
+  const [a,u]=await Promise.all([window.claude?.use?window.claude.use('artifact'):null,window.claude?.use?window.claude.use('user'):null]);
+  artifact=a;
+  if(!a){canEdit=true;mode='local';try{const v=localStorage.getItem(LSK);if(v){const o=JSON.parse(v);if(o&&o.teachers){S=o}}}catch(e){}}else{const own=u?((await u.isOwner())||(await u.canEdit())):false;canEdit=!!own;mode=canEdit?'saved':'readonly';userApi=u;try{myId=u?await u.id():null}catch(e){}}
+}catch(e){canEdit=true;mode='local'}render();
+  try{const dk=await window.claude?.use?.('desktop');if(dk&&dk.install&&await dk.install.state()==='available'){desktopApi=dk;render()}}catch(e){}})();
+}
+</script><script>if("serviceWorker" in navigator&&location.protocol==="https:"){navigator.serviceWorker.register("sw.js").catch(function(){})}</script></body></html>
