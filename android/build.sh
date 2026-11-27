@@ -2,7 +2,7 @@
 # APK 만들기 (Git Bash에서 실행): sh build.sh
 # 화면(index.html)을 고친 뒤 업데이트할 때는 VERSION 숫자를 올린다.
 set -e
-VERSION=1
+VERSION=2
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
 B="$HOME/android-build"

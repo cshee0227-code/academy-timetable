@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "rooms": {
+      "$code": {
+        ".read": "$code.length >= 16",
+        "doc": {
+          ".write": "$code.length >= 16 && newData.hasChildren(['rev', 'json']) && newData.child('json').isString() && newData.child('json').val().length < 500000 && newData.child('rev').val() === (data.exists() ? data.child('rev').val() + 1 : 1)"
+        }
+      }
+    }
+  }
+}

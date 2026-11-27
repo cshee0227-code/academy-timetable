@@ -2,7 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="kr.personal.academytimetable">
 
-    <!-- 인터넷 권한 없음: 데이터가 휴대폰 밖으로 나가지 않는다 -->
+    <!-- 인터넷 권한: 여러 기기 공유(Firebase)와 웹 글꼴에 쓴다. 공유를 켜지 않으면 시간표는 휴대폰 밖으로 나가지 않는다 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="학원 시간표"
         android:icon="@drawable/icon"

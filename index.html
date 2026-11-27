@@ -199,17 +199,92 @@ let myId=null,userApi=null,names={},desktopApi=null,canEdit=false,mode='checking
 const keepUi=()=>{try{sessionStorage.setItem('acad-ui',JSON.stringify(ui))}catch(e){}};
 const root=document.getElementById('root');
 
-function commit(fn,msg){if(!canEdit)return;hist.push(JSON.stringify(S));if(hist.length>40)hist.shift();fn();S.sample=false;if(msg){S.log=[{u:myId,t:Date.now(),m:String(msg)},...(S.log||[])].slice(0,60)}dirty=true;render();queueSave()}
+function commit(fn,msg){if(!canEdit)return;hist.push(JSON.stringify(S));if(hist.length>40)hist.shift();fn();S.sample=false;if(msg){S.log=[{u:myId,n:myName||undefined,t:Date.now(),m:String(msg)},...(S.log||[])].slice(0,60)}dirty=true;render();queueSave()}
 const LSK='academy-timetable-v1';
-function queueSave(){clearTimeout(saveTimer);if(!artifact&&mode==='local'){try{localStorage.setItem(LSK,JSON.stringify(S));dirty=false}catch(e){}}setStatus();if(!artifact)return;saveTimer=setTimeout(save,2500)}
+function queueSave(){clearTimeout(saveTimer);if(!artifact&&mode==='local'){try{localStorage.setItem(LSK,JSON.stringify(S));if(!sync)dirty=false}catch(e){}if(sync){dirty=true;saveMeta();clearTimeout(sync.pt);sync.pt=setTimeout(push,500)}}setStatus();if(!artifact)return;saveTimer=setTimeout(save,2500)}
 function buildDoc(){const j=JSON.stringify(S).replace(/</g,'\\u003c');
   return '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>학원 시간표</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet"><style id="css">'+CSS+'<\/style></head><body><div id="root"></div>\n<script type="application/json" id="state">'+j+'<\/script>\n<script id="app">'+APP+'<\/script></body></html>'}
 async function save(){if(!artifact||!dirty)return;mode='saving';setStatus();keepUi();
   try{await artifact.publish(buildDoc());dirty=false;mode='saved'}catch(e){const c=String(e&&(e.code||e.message)||e);if(/not_granted|not_writer/.test(c)){canEdit=false;mode='readonly';render()}else if(/conflict/.test(c)){mode='saved'}else mode='error'}
   setStatus()}
 function setStatus(){const el=document.getElementById('st');if(!el)return;
-  const m=dirty&&mode!=='saving'?(artifact?'변경 사항 저장 대기 중…':'저장되지 않음 (이 브라우저는 저장소를 막고 있음)'):({checking:'연결 확인 중…',saving:'저장 중…',saved:canEdit?'저장됨 · 모든 화면에 실시간 반영':'보기 전용 · 수정 시 자동 갱신',readonly:'보기 전용 · 수정 시 자동 갱신',error:'저장 실패 · 잠시 후 다시 수정해 주세요',local:'이 기기에 자동 저장됨'})[mode];
-  el.className='status'+(dirty||mode==='saving'||mode==='error'?' busy':'');el.innerHTML='<i class="dot"></i><span></span>';el.querySelector('span').textContent=m}
+  const m=sync?(sync.st==='err'?'공유 서버가 저장을 거부했습니다':sync.st==='off'?'오프라인 · 연결되면 자동으로 맞춥니다':dirty||sync.busy?'저장 중…':'공유 중 · 다른 기기에 실시간 반영'):dirty&&mode!=='saving'?(artifact?'변경 사항 저장 대기 중…':'저장되지 않음 (이 브라우저는 저장소를 막고 있음)'):({checking:'연결 확인 중…',saving:'저장 중…',saved:canEdit?'저장됨 · 모든 화면에 실시간 반영':'보기 전용 · 수정 시 자동 갱신',readonly:'보기 전용 · 수정 시 자동 갱신',error:'저장 실패 · 잠시 후 다시 수정해 주세요',local:'이 기기에 자동 저장됨'})[mode];
+  el.className='status'+(dirty||mode==='saving'||mode==='error'||(sync&&sync.st!=='ok')?' busy':'');el.innerHTML='<i class="dot"></i><span></span>';el.querySelector('span').textContent=m}
+
+/* ---------- 여러 기기 공유 (Firebase Realtime Database) ----------
+   SYNC_URL이 비어 있으면 공유 기능은 화면에 나타나지 않는다.
+   서버에는 rooms/<공유코드>/doc = {rev, json} 한 건만 둔다. rev는 저장할 때마다 1씩 올라가야 하며(서버 규칙),
+   다른 기기가 먼저 저장해 거부되면 그 내용을 받아 내 변경과 합친 뒤 다시 올린다. */
+const SYNC_URL='https://academyschedulee2-default-rtdb.asia-southeast1.firebasedatabase.app';
+const SITE_URL='https://cshee0227-code.github.io/academy-timetable/';
+const MK='academy-sync-meta',NK='academy-my-name';
+let sync=null,myName='',shareNote='';
+try{myName=localStorage.getItem(NK)||''}catch(e){}
+const docUrl=()=>SYNC_URL+'/rooms/'+sync.code+'/doc.json';
+const newCode=()=>{const a=new Uint8Array(20);crypto.getRandomValues(a);return Array.from(a,x=>'abcdefghjkmnpqrstuvwxyz23456789'[x%31]).join('')};
+const parseCode=t=>{t=String(t||'').trim();const m=t.match(/join=([A-Za-z0-9]+)/);return(m?m[1]:t).toLowerCase()};
+const okCode=c=>/^[a-z0-9]{16,40}$/.test(c);
+function shareMsg(t){shareNote=t;const el=document.getElementById('shn');if(el)el.textContent=t}
+function saveMeta(){if(!sync)return;try{localStorage.setItem(MK,JSON.stringify({code:sync.code,rev:sync.rev,base:sync.base,dirty}))}catch(e){}}
+function merge3(base,local,remote){const out=JSON.parse(JSON.stringify(remote));out.assign=out.assign||{};
+  const ba=base.assign||{},la=local.assign||{};
+  for(const k of new Set([...Object.keys(ba),...Object.keys(la)]))if(ba[k]!==la[k]){if(la[k])out.assign[k]=la[k];else delete out.assign[k]}
+  for(const f of ['teachers','students'])if(JSON.stringify(base[f])!==JSON.stringify(local[f]))out[f]=JSON.parse(JSON.stringify(local[f]));
+  const seen=new Set((base.log||[]).map(l=>l.t+'|'+l.m));const add=(local.log||[]).filter(l=>!seen.has(l.t+'|'+l.m));
+  out.log=[...add,...(out.log||[])].sort((a,b)=>b.t-a.t).slice(0,60);out.sample=false;return out}
+function adopt(doc){sync.rev=doc.rev;sync.base=doc.json;S=JSON.parse(doc.json);hist=[];dirty=false;try{localStorage.setItem(LSK,doc.json)}catch(e){}saveMeta()}
+const busyUI=()=>!!drag||!!document.querySelector('.sheet')||!!(document.activeElement&&/^(INPUT|SELECT)$/.test(document.activeElement.tagName)&&root.contains(document.activeElement));
+function onRemote(doc){if(!sync||!doc||typeof doc.json!=='string'||!(doc.rev>sync.rev))return;
+  if(dirty||sync.busy){sync.seen=doc;return} /* 내 변경을 올릴 때 합쳐지고, 아니면 올린 뒤에 반영한다 */
+  if(busyUI()){clearTimeout(sync.rt);sync.rt=setTimeout(()=>onRemote(doc),1500);return}
+  adopt(doc);sync.st='ok';render()}
+async function pull(){const r=await fetch(docUrl(),{cache:'no-store'});if(!r.ok)throw new Error('http '+r.status);return r.json()}
+async function push(){if(!sync)return;if(sync.busy){sync.again=true;return}const me=sync;me.busy=true;setStatus();
+  try{for(let i=0;i<6&&dirty;i++){const json=JSON.stringify(S);
+      const r=await fetch(docUrl(),{method:'PUT',body:JSON.stringify({rev:me.rev+1,json})});
+      if(sync!==me)return;
+      if(r.ok){me.rev++;me.base=json;if(JSON.stringify(S)===json)dirty=false;me.st='ok';saveMeta();continue}
+      if(r.status!==401&&r.status!==403)throw new Error('http '+r.status);
+      const doc=await pull();if(sync!==me)return;
+      if(!doc||typeof doc.json!=='string'||!(doc.rev>me.rev))throw new Error('denied');
+      S=merge3(JSON.parse(me.base),S,JSON.parse(doc.json));me.rev=doc.rev;me.base=doc.json;hist=[];try{localStorage.setItem(LSK,JSON.stringify(S))}catch(e){}saveMeta();render()}
+    if(dirty){clearTimeout(me.pt);me.pt=setTimeout(push,1500)}
+  }catch(e){if(sync===me){me.st=e&&e.message==='denied'?'err':'off';clearTimeout(me.pt);me.pt=setTimeout(push,5000)}}
+  finally{me.busy=false;if(sync===me){if(me.again){me.again=false;if(dirty)push()}if(!dirty&&!me.busy&&me.seen){const d=me.seen;me.seen=null;onRemote(d)}setStatus()}}}
+async function tick(){if(!sync||sync.busy)return;if(dirty)return push();const me=sync;
+  try{const doc=await pull();if(sync!==me)return;if(me.st==='off'){me.st='ok';setStatus()}onRemote(doc)}catch(e){if(sync===me){me.st='off';setStatus()}}}
+function listen(){if(!sync||!window.EventSource)return;const me=sync;try{me.es&&me.es.close()}catch(e){}
+  const es=me.es=new EventSource(docUrl());
+  const h=e=>{if(sync!==me)return;try{const d=JSON.parse(e.data);if(d&&d.path==='/'&&d.data)onRemote(d.data);else tick()}catch(x){}};
+  es.addEventListener('put',h);es.addEventListener('patch',h);
+  es.onerror=()=>{if(sync===me&&es.readyState===2)setTimeout(()=>{if(sync===me)listen()},5000)}}
+function stopSync(forget){if(sync){try{sync.es&&sync.es.close()}catch(e){}clearTimeout(sync.pt);clearTimeout(sync.rt)}sync=null;dirty=false;if(forget){try{localStorage.removeItem(MK)}catch(e){}}}
+async function startSync(code,how,meta){stopSync();const me=sync={code,rev:0,base:JSON.stringify(S),st:'ok',busy:false};
+  if(how==='resume'&&meta){me.rev=meta.rev||0;if(typeof meta.base==='string')me.base=meta.base;dirty=!!meta.dirty}
+  setStatus();let doc;
+  try{doc=await pull()}catch(e){if(sync!==me)return;if(how==='resume'){me.st='off';listen();render();return}
+    stopSync();render();return shareMsg('공유 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.')}
+  if(sync!==me)return;const has=!!doc&&typeof doc.json==='string';
+  if(how==='create'&&has){stopSync();render();return shareMsg('공유를 시작하지 못했습니다. 다시 눌러 주세요.')}
+  if(how==='join'&&!has){stopSync();render();return shareMsg('공유 링크에 해당하는 시간표를 찾을 수 없습니다.')}
+  if(!has){me.rev=0;dirty=true}
+  else if(how==='join'){try{localStorage.setItem(LSK+'-before-join',JSON.stringify(S))}catch(e){}adopt(doc)}
+  else if(!dirty&&(doc.rev!==me.rev||doc.json!==me.base))adopt(doc);
+  saveMeta();listen();render();if(dirty)push()}
+function bootSync(){let meta=null;try{meta=JSON.parse(localStorage.getItem(MK)||'null')}catch(e){}
+  const m=location.hash.match(/^#join=([A-Za-z0-9]+)/);
+  if(m){history.replaceState(null,'',location.pathname+location.search);const c=parseCode(m[1]);if(okCode(c)&&!(meta&&meta.code===c))return startSync(c,'join')}
+  if(meta&&okCode(meta.code))startSync(meta.code,'resume',meta)}
+setInterval(tick,25000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
+window.addEventListener('online',tick);
+function shareHTML(){if(!SYNC_URL||mode!=='local')return'';
+  if(sync)return`<h3 style="margin-top:18px">여러 기기 공유</h3><p class="note">공유 중입니다. 아래 링크를 가진 사람은 누구나 이 시간표를 보고 고칠 수 있으니, 함께 쓰는 선생님에게만 전달하세요. 휴대폰 앱(APK)에서는 이 링크를 '공유 참여' 칸에 붙여 넣으면 됩니다.</p>
+   <div class="row"><input id="shLink" readonly value="${esc(SITE_URL+'#join='+sync.code)}" style="flex:1;min-width:220px" aria-label="공유 링크"><button class="btn pri" id="shCopy">링크 복사</button></div>
+   <div class="row" style="margin-top:8px"><label style="min-width:auto" for="shName">내 이름</label><input id="shName" value="${esc(myName)}" placeholder="최근 변경에 표시" style="width:170px"><button class="btn warn" id="shStop">이 기기에서 공유 끊기</button></div><p class="note" id="shn">${esc(shareNote)}</p>`;
+  return`<h3 style="margin-top:18px">여러 기기 공유</h3><p class="note">공유를 시작하면 이 기기의 시간표가 서버에 올라가고, 링크를 받은 다른 기기와 실시간으로 함께 고칠 수 있습니다. 이미 공유 중인 시간표에 참여하면 이 기기의 현재 시간표는 공유 시간표로 바뀝니다.</p>
+   <div class="row"><button class="btn pri" id="shStart">이 시간표로 공유 시작</button></div>
+   <div class="row" style="margin-top:8px"><input id="shCode" placeholder="받은 공유 링크 붙여넣기" style="flex:1;min-width:220px" aria-label="받은 공유 링크"><button class="btn" id="shJoin">공유 참여</button></div><p class="note" id="shn">${esc(shareNote)}</p>`}
 
 /* ---------- render ---------- */
 const colorOf=t=>{const subs=[...new Set(S.teachers.map(x=>x.subj))];return PAL[Math.max(0,subs.indexOf(t?.subj))%PAL.length]};
@@ -247,7 +322,7 @@ function sidePanel(an){
   <p class="note">미배정·초과 수업</p><ul class="list">${sh||'<li class="ok">모두 배정됨</li>'}</ul>
   <p class="note">학생 연강 이상</p><ul class="list">${sg||'<li class="ok">모든 학생 연강 정상</li>'}</ul>
   <p class="note">선생님 공강 합계</p><ul class="list">${tg||'<li class="ok">공강 없음</li>'}</ul>
-  <h3 style="margin-top:16px">최근 변경</h3><ul class="list">${(S.log||[]).slice(0,8).map(l=>`<li style="display:block"><span>${esc(l.m)}</span><small class="note" style="display:block"><span class="who" data-uid="${esc(l.u||'')}">${l.u?'':(userApi?'알 수 없음':'이 기기')}</span> · ${ago(l.t)}</small></li>`).join('')||'<li class="note">아직 기록이 없습니다.</li>'}</ul></aside>`}
+  <h3 style="margin-top:16px">최근 변경</h3><ul class="list">${(S.log||[]).slice(0,8).map(l=>`<li style="display:block"><span>${esc(l.m)}</span><small class="note" style="display:block"><span class="who" data-uid="${esc(l.u||'')}">${l.u?'':(l.n?esc(l.n):(userApi?'알 수 없음':(sync?'이름 없음':'이 기기')))}</span> · ${ago(l.t)}</small></li>`).join('')||'<li class="note">아직 기록이 없습니다.</li>'}</ul></aside>`}
 const ago=t=>{const m=Math.round((Date.now()-t)/60000);if(m<1)return'방금';if(m<60)return m+'분 전';const h=Math.round(m/60);if(h<24)return h+'시간 전';const d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate()};
 async function fillNames(){const els=[...document.querySelectorAll('.who[data-uid]')].filter(e=>e.dataset.uid);if(!els.length)return;
   if(!userApi){els.forEach(e=>e.textContent='이 기기');return}
@@ -304,7 +379,7 @@ function infoHTML(){const dis=canEdit?'':'disabled';
   ${mode==='local'?`<p class="note">이 파일 버전은 데이터를 <b>이 기기 브라우저</b>에 저장합니다. 다른 기기로 옮기거나 보관하려면 백업 파일을 내보내고 불러오세요.</p>
   <div class="row"><button class="btn" id="expJ">백업 내보내기(.json)</button><label class="btn" style="display:inline-flex;align-items:center">백업 불러오기<input type="file" id="impJ" accept=".json,application/json" hidden></label><button class="btn warn" id="resetS">예시 데이터로 초기화</button></div>`
   :`<p class="note">Claude에 게시된 버전은 편집 권한이 있는 사람이 수정하면 모든 화면에 실시간으로 반영됩니다. 누가 무엇을 바꿨는지는 주간 보드 오른쪽 '최근 변경'에서 확인할 수 있습니다.</p>`}
-  ${desktopApi?'<div class="row" style="margin-top:8px"><button class="btn pri" id="instD">데스크톱 앱으로 설치</button></div>':''}<p class="note" id="bk"></p></section>
+  ${shareHTML()}${desktopApi?'<div class="row" style="margin-top:8px"><button class="btn pri" id="instD">데스크톱 앱으로 설치</button></div>':''}<p class="note" id="bk"></p></section>
   <p class="note">출근시간·등원시간을 바꾸면 보드에서 맞지 않는 칸이 즉시 충돌로 표시됩니다. 주간 보드의 '남은 수업 자동 배정'을 누르면 충돌 칸만 다시 맞춥니다.${S.sample?' 현재는 예시 데이터입니다.':''}</p>`}
 
 function openCell(k){if(!canEdit)return;const[d,p,t]=k.split('|');const te=T(t);const cur=S.assign[k];const an=analyze(S);
@@ -336,7 +411,7 @@ function wire(an){
   const g=id=>document.getElementById(id);
   if(g('autoFill'))g('autoFill').onclick=()=>runAuto('fill');
   if(g('autoAll'))g('autoAll').onclick=()=>runAuto('all');
-  if(g('undo'))g('undo').onclick=()=>{if(!hist.length)return;S=JSON.parse(hist.pop());S.log=[{u:myId,t:Date.now(),m:'실행 취소'},...(S.log||[])].slice(0,60);dirty=true;render();queueSave()};
+  if(g('undo'))g('undo').onclick=()=>{if(!hist.length)return;S=JSON.parse(hist.pop());S.log=[{u:myId,n:myName||undefined,t:Date.now(),m:'실행 취소'},...(S.log||[])].slice(0,60);dirty=true;render();queueSave()};
   if(g('who'))g('who').onchange=e=>{ui.who=e.target.value;history.replaceState(null,'','#'+(T(ui.who)?'teacher-':'student-')+ui.who);render()};
   if(g('copyLink'))g('copyLink').onclick=async e=>{const h2='#'+(T(ui.who)?'teacher-':'student-')+ui.who;history.replaceState(null,'','#'+h2.slice(1));
     try{await navigator.clipboard.writeText(location.href.split('#')[0]+h2);g('prog').textContent='링크를 복사했습니다'}catch(x){g('prog').textContent='주소창의 링크를 복사해 주세요'}};
@@ -355,6 +430,11 @@ function wire(an){
   root.querySelectorAll('[data-rqadd]').forEach(b=>b.onclick=()=>commit(()=>S.students[b.dataset.rqadd].req.push({t:S.teachers[0].id,n:1})));
   const nid=(arr,p)=>p+(Math.max(0,...arr.map(x=>+x.id.slice(1)||0))+1);
   if(g('copyLink')&&window.Android)g('copyLink').hidden=true;
+  if(g('shStart'))g('shStart').onclick=()=>{shareNote='';startSync(newCode(),'create')};
+  if(g('shJoin'))g('shJoin').onclick=()=>{const c=parseCode(g('shCode').value);if(!okCode(c))return shareMsg('공유 링크가 올바르지 않습니다.');shareNote='';startSync(c,'join')};
+  if(g('shCopy'))g('shCopy').onclick=async()=>{const el=g('shLink');try{await navigator.clipboard.writeText(el.value)}catch(x){el.focus();el.select();try{document.execCommand('copy')}catch(y){}}shareMsg('링크를 복사했습니다.')};
+  if(g('shName'))g('shName').onchange=e=>{myName=e.target.value.trim().slice(0,20);try{localStorage.setItem(NK,myName)}catch(x){}};
+  if(g('shStop'))g('shStop').onclick=()=>{const b=g('shStop');if(b.dataset.ok){stopSync(true);shareNote='공유를 끊었습니다. 이 기기의 시간표는 그대로 남아 있습니다.';render()}else{b.dataset.ok=1;b.textContent='한 번 더 누르면 끊기'}};
   if(g('expJ'))g('expJ').onclick=()=>{const fn='학원시간표_백업_'+new Date().toISOString().slice(0,10)+'.json';if(window.Android&&window.Android.saveBackup){window.Android.saveBackup(fn,JSON.stringify(S,null,1));return}
     const bl=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
   if(g('impJ'))g('impJ').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!o.teachers||!o.students||!o.assign)throw 0;commit(()=>{S=o;S.teachers.forEach(t=>t.av=t.av.slice(0,ND));S.students.forEach(s=>{s.av=s.av.slice(0,ND);if(!s.span)s.span=[2,4]})})}catch(x){g('bk').textContent='백업 파일 형식이 올바르지 않습니다.'}};
@@ -408,7 +488,7 @@ render();
 (async()=>{try{
   const [a,u]=await Promise.all([window.claude?.use?window.claude.use('artifact'):null,window.claude?.use?window.claude.use('user'):null]);
   artifact=a;
-  if(!a){canEdit=true;mode='local';try{const v=localStorage.getItem(LSK);if(v){const o=JSON.parse(v);if(o&&o.teachers){S=o}}}catch(e){}}else{const own=u?((await u.isOwner())||(await u.canEdit())):false;canEdit=!!own;mode=canEdit?'saved':'readonly';userApi=u;try{myId=u?await u.id():null}catch(e){}}
+  if(!a){canEdit=true;mode='local';try{const v=localStorage.getItem(LSK);if(v){const o=JSON.parse(v);if(o&&o.teachers){S=o}}}catch(e){}if(SYNC_URL)bootSync()}else{const own=u?((await u.isOwner())||(await u.canEdit())):false;canEdit=!!own;mode=canEdit?'saved':'readonly';userApi=u;try{myId=u?await u.id():null}catch(e){}}
 }catch(e){canEdit=true;mode='local'}render();
   try{const dk=await window.claude?.use?.('desktop');if(dk&&dk.install&&await dk.install.state()==='available'){desktopApi=dk;render()}}catch(e){}})();
 }
