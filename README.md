@@ -34,8 +34,8 @@ https://cshee0227-code.github.io/academy-timetable/ 를 휴대폰에서 열고 '
 3. 누가 고치든 다른 화면에 1~2초 안에 반영됩니다. 동시에 고쳐도 서로 다른 칸이면 둘 다 남습니다.
 
 - 링크를 가진 사람은 누구나 시간표를 보고 고칠 수 있으니, 함께 쓰는 사람에게만 전달하세요.
-- 공유한 시간표는 Firebase Realtime Database에 저장됩니다. 서버 규칙은 에 있습니다.
-- 다른 Firebase 프로젝트를 쓰려면 의 을 바꾸고 그 프로젝트에 같은 규칙을 넣습니다.
+- 공유한 시간표는 Firebase Realtime Database에 저장됩니다. 서버 규칙은 `firebase-rules.json`에 있습니다.
+- 다른 Firebase 프로젝트를 쓰려면 `index.html`의 `SYNC_URL`을 바꾸고 그 프로젝트에 같은 규칙을 넣습니다.
 
 ## 데이터 저장 방식
 - 공유를 켜지 않으면 데이터는 각 기기의 브라우저에만 저장됩니다.
