@@ -354,7 +354,9 @@ function wire(an){
   root.querySelectorAll('[data-rqdel]').forEach(b=>b.onclick=()=>{const[i,j]=b.dataset.rqdel.split('|');commit(()=>S.students[i].req.splice(j,1))});
   root.querySelectorAll('[data-rqadd]').forEach(b=>b.onclick=()=>commit(()=>S.students[b.dataset.rqadd].req.push({t:S.teachers[0].id,n:1})));
   const nid=(arr,p)=>p+(Math.max(0,...arr.map(x=>+x.id.slice(1)||0))+1);
-  if(g('expJ'))g('expJ').onclick=()=>{const bl=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download='학원시간표_백업_'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+  if(g('copyLink')&&window.Android)g('copyLink').hidden=true;
+  if(g('expJ'))g('expJ').onclick=()=>{const fn='학원시간표_백업_'+new Date().toISOString().slice(0,10)+'.json';if(window.Android&&window.Android.saveBackup){window.Android.saveBackup(fn,JSON.stringify(S,null,1));return}
+    const bl=new Blob([JSON.stringify(S,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
   if(g('impJ'))g('impJ').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const o=JSON.parse(await f.text());if(!o.teachers||!o.students||!o.assign)throw 0;commit(()=>{S=o;S.teachers.forEach(t=>t.av=t.av.slice(0,ND));S.students.forEach(s=>{s.av=s.av.slice(0,ND);if(!s.span)s.span=[2,4]})})}catch(x){g('bk').textContent='백업 파일 형식이 올바르지 않습니다.'}};
   if(g('resetS'))g('resetS').onclick=()=>{if(g('resetS').dataset.ok){commit(()=>{S=seed();S.assign=autoSchedule(S,'all',30).assign})}else{g('resetS').dataset.ok=1;g('resetS').textContent='한 번 더 누르면 초기화'}};
   if(g('instD'))g('instD').onclick=async()=>{try{await desktopApi.install.request()}catch(x){g('bk').textContent='설치를 시작하지 못했습니다.'}};
